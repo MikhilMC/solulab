@@ -1,0 +1,121 @@
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+---
+  - name: Deploy products description network
+    hosts: localhost
+    vars:
+      #
+      # For information on these configuration options, read the documentation:
+      # https://github.com/IBM-Blockchain/ansible-role-blockchain-platform-manager#example-playbook
+      #
+      infrastructure:
+        type: docker
+        docker:
+          network: products_description_network
+      organizations:
+        - &Producer
+          msp:
+            id: "ProducerMSP"
+            admin:
+              identity: "producerAdmin"
+              secret: "producerAdminpw"
+            ibp:
+              display_name: "Producer MSP"
+          ca: &ProducerCA
+            id: "ProducerCA"
+            admin_identity: "admin"
+            admin_secret: "adminpw"
+            tls:
+              enabled: true
+            docker:
+              name: ca.producer.example.com
+              hostname: ca.producer.example.com
+              port: 18050
+            ibp:
+              display_name: "Producer CA"
+          peers:
+            - &ProducerPeer1
+              id: "ProducerPeer1"
+              identity: "producerpeer1"
+              secret: "producerpeer1pw"
+              database_type: couchdb
+              tls:
+                enabled: true
+                identity: "producerpeer1tls"
+                secret: "producerpeer1tlspw"
+              docker:
+                name: peer0.producer.example.com
+                hostname: peer0.producer.example.com
+                port: 18051
+                chaincode_port: 18052
+                operations_port: 18053
+                couchdb:
+                  name: couchdb0.producer.example.com
+                  hostname: couchdb0.producer.example.com
+                  port: 18054
+              ibp:
+                display_name: "Producer Peer1"
+          nodes: "{{ playbook_dir }}/nodes/Producer"
+          wallet: "{{ playbook_dir }}/wallets/Producer"
+          gateways: "{{ playbook_dir }}/gateways/Producer"
+        - &OrdererOrg
+          msp:
+            id: "OrdererMSP"
+            admin:
+              identity: "ordererAdmin"
+              secret: "ordererAdminpw"
+            ibp:
+              display_name: "Orderer MSP"
+          ca: &OrdererCA
+            id: "OrdererCA"
+            admin_identity: "admin"
+            admin_secret: "adminpw"
+            tls:
+              enabled: true
+            docker:
+              name: ca.orderer.example.com
+              hostname: ca.orderer.example.com
+              port: 17050
+            ibp:
+              display_name: "Orderer CA"
+          orderer: &Orderer
+            id: "Orderer1"
+            identity: "orderer1"
+            secret: "orderer1pw"
+            tls:
+              enabled: true
+              identity: "orderer1tls"
+              secret: "orderer1tlspw"
+            consortium:
+              members:
+                - *Producer
+            docker:
+              name: orderer.example.com
+              hostname: orderer.example.com
+              port: 17051
+              operations_port: 17052
+            ibp:
+              display_name: "Orderer1"
+              cluster_name: "OrdererCluster"
+          nodes: "{{ playbook_dir }}/nodes/Orderer"
+          wallet: "{{ playbook_dir }}/wallets/Orderer"
+          gateways: "{{ playbook_dir }}/gateways/Orderer"
+      channels:
+        - &ProductionChannel
+          name: productionchannel
+          orderer: *Orderer
+          members:
+            - <<: *Producer
+              committing_peers:
+                - *ProducerPeer1
+              anchor_peers:
+                - *ProducerPeer1
+      gateways:
+        - name: Producer gateway
+          organization:
+            <<: *Producer
+            gateway_peers:
+              - <<: *ProducerPeer1
+    roles:
+      - ibm.blockchain_platform_manager
